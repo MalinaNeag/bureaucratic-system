@@ -1,12 +1,12 @@
 package main.java;
 
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-// Class representing a Book
 class Book {
     private String title;
-    private Lock lock = new ReentrantLock();  // Lock for concurrency control
+    private Lock lock = new ReentrantLock(true);  // Fair lock to avoid starvation
 
     public Book(String title) {
         this.title = title;
@@ -17,19 +17,32 @@ class Book {
     }
 
     public boolean borrowBook(Citizen citizen) {
-        if (lock.tryLock()) {
-            try {
-                System.out.println(citizen.getId() + " is borrowing " + title);
-                Thread.sleep(1000);  // Simulate borrowing process
-                return true;
-            } catch (InterruptedException e) {
-                e.printStackTrace();
+        try {
+            if (lock.tryLock(1, TimeUnit.SECONDS)) { // prevent deadlock using timeout
+                try {
+                    // check for membership and book availability
+                    if (!FirebaseDatabase.isCitizenEligible(citizen.getId())) {
+                        System.out.println(citizen.getId() + " is not eligible to borrow.");
+                        return false;
+                    }
+                    if (!FirebaseDatabase.isBookAvailable(title)) {
+                        System.out.println("Book " + title + " is not available.");
+                        return false;
+                    }
+
+                    System.out.println(citizen.getId() + " is borrowing " + title);
+                    FirebaseDatabase.updateBookStatus(title, false);  // mark book as unavailable
+                    Thread.sleep(1000);  // simulate time to process the borrowing
+                    return true;
+                } finally {
+                    lock.unlock(); // release lock
+                }
+            } else {
+                System.out.println(citizen.getId() + " could not borrow " + title + " (timeout).");
                 return false;
-            } finally {
-                lock.unlock();
             }
-        } else {
-            System.out.println(citizen.getId() + " failed to borrow " + title + " (book locked).");
+        } catch (InterruptedException e) {
+            e.printStackTrace();
             return false;
         }
     }

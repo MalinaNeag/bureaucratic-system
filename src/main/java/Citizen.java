@@ -22,7 +22,14 @@ class Citizen {
         this.membership = membership;
     }
 
-    public static void main(String[] args) {
-        System.out.println("ppp");
+    // verify ID and generate membership
+    public void verifyAndGenerateMembership() {
+        if (FirebaseDatabase.verifyCitizenID(id)) {
+            System.out.println("Citizen ID " + id + " verified.");
+            this.membership = true;
+            FirebaseDatabase.storeMembership(id); // Store the membership in Firebase
+        } else {
+            System.out.println("Citizen ID " + id + " could not be verified.");
+        }
     }
 }
