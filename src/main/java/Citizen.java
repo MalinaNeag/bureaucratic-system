@@ -1,35 +1,44 @@
 package main.java;
 
-// Class representing a Citizen
-class Citizen {
+public class Citizen {
+    private String name;
     private String id;
-    private boolean membership;
+    private String membershipId;
+    private Membership membership;
 
-    public Citizen(String id) {
+    public Citizen(String name, String id) {
+        this.name = name;
         this.id = id;
-        this.membership = false;
+    }
+
+    public Citizen(String name, String id, String membershipId) {
+        this.name = name;
+        this.id = id;
+        this.membershipId = membershipId;
+    }
+
+    // Getters and Setters
+    public String getName() {
+        return name;
     }
 
     public String getId() {
         return id;
     }
 
-    public boolean hasMembership() {
+    public String getMembershipId() {
+        return membershipId;
+    }
+
+    public Membership getMembership() {
         return membership;
     }
 
-    public void setMembership(boolean membership) {
+    public void setMembership(Membership membership) {
         this.membership = membership;
     }
 
-    // verify ID and generate membership
-    public void verifyAndGenerateMembership() {
-        if (FirebaseDatabase.verifyCitizenID(id)) {
-            System.out.println("Citizen ID " + id + " verified.");
-            this.membership = true;
-            FirebaseDatabase.storeMembership(id); // Store the membership in Firebase
-        } else {
-            System.out.println("Citizen ID " + id + " could not be verified.");
-        }
+    public boolean hasValidMembership() {
+        return membership != null;
     }
 }
