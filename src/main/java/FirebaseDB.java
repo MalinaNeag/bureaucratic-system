@@ -1,4 +1,4 @@
-package main.java;
+import java.util.List;
 
 public class FirebaseDB {
     // Simulate fetching a book from Firebase
@@ -16,4 +16,22 @@ public class FirebaseDB {
     public static void addMembership(Membership membership) {
         System.out.println("Membership for " + membership.getCitizenName() + " added to CitizenMSDB.");
     }
+
+    public static List<Book> getAllBooks() {
+        // Return all books from your database
+        // This is just a placeholder, replace it with actual DB access logic
+        return List.of(
+                new Book("Book1", "true",true),
+                new Book("Book2", "false",false)
+        );
+    }
+
+    public static Membership getMembershipByCitizenName(String citizenName) {
+        // This method should look up and return a Membership object by citizen's name
+        // For now, it's a placeholder. Replace this with actual database lookup logic.
+        // Example: return a membership if the citizen is found, otherwise return null
+        return null;  // Placeholder for actual lookup
+    }
+
+
 }

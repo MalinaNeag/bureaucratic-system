@@ -1,16 +1,19 @@
-package main.java;
-
 public class Citizen {
     private String name;
     private String id;
     private String membershipId;
     private Membership membership;
 
+    // No-argument constructor (needed for deserialization)
+    public Citizen() {}
+
+    // Constructor with name and id
     public Citizen(String name, String id) {
         this.name = name;
         this.id = id;
     }
 
+    // Constructor with name, id, and membershipId
     public Citizen(String name, String id, String membershipId) {
         this.name = name;
         this.id = id;

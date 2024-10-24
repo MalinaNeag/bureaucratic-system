@@ -1,4 +1,4 @@
-package main.java;
+
 
 public class Membership {
     private String membershipNumber;

@@ -1,5 +1,5 @@
-package main.java;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -11,13 +11,17 @@ public class BookLoaningDepartment {
     private final Queue<Citizen> queue = new LinkedList<>();
     private Lock bookLoanLock = new ReentrantLock();
 
-    private BookLoaningDepartment() {}
+    protected BookLoaningDepartment() {}
 
     public static synchronized BookLoaningDepartment getInstance() {
         if (instance == null) {
             instance = new BookLoaningDepartment();
         }
         return instance;
+    }
+    public List<Book> getAllBooks() {
+        // Assuming FirebaseDB has a method to get all books
+        return FirebaseDB.getAllBooks();
     }
 
     public void borrowBook(Citizen citizen, String bookTitle) {

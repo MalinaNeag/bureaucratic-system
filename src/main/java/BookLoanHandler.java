@@ -1,4 +1,3 @@
-package main.java;
 
 import com.google.gson.Gson;
 import com.sun.net.httpserver.HttpExchange;
@@ -27,4 +26,25 @@ public class BookLoanHandler implements HttpHandler {
             os.close();
         }
     }
+
+    public boolean handleLoanRequest(LoanRequest loanRequest) {
+        // Extract the citizen and book title from the loan request
+        Citizen citizen = loanRequest.getCitizen();
+        String requestedBook = loanRequest.getBookTitle();
+
+        if (citizen == null || requestedBook == null || requestedBook.isEmpty()) {
+            // Invalid request, missing citizen or book title
+            return false;
+        }
+
+        // Start a thread to handle the book borrowing process asynchronously
+        Thread loanThread = new Thread(() -> {
+            BookLoaningDepartment.getInstance().borrowBook(citizen, requestedBook);
+        });
+        loanThread.start();
+
+        // Return true to indicate that the loan request has been initiated
+        return true;
+    }
+
 }
