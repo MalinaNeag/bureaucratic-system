@@ -15,35 +15,30 @@ public class EnrollmentDepartment {
     }
 
     // Check if the citizen is already enrolled
-    public boolean isCitizenEnrolled(Citizen citizen) {
-        Membership existingMembership = FirebaseDB.getMembershipByCitizenName(citizen.getName());
+    public synchronized boolean isCitizenEnrolled(Citizen citizen) {
+        String existingMembership = FirebaseDB.getMembershipIdById(citizen.getId());
         return existingMembership != null; // Return true if membership exists, false otherwise
     }
 
     // Add the citizen to the system (only if not already enrolled)
-    public boolean addCitizen(Citizen citizen) {
+    public synchronized boolean addCitizen(Citizen citizen) {
         try {
-            enrollmentLock.lock();
-
-            // Check if the citizen is already enrolled
-            if (isCitizenEnrolled(citizen)) {
-                System.out.println("Citizen " + citizen.getName() + " is already enrolled.");
-                return false;  // Citizen is already enrolled, return false
-            }
-
-            // Proceed with enrollment if no existing membership
             System.out.println("Enrolling citizen: " + citizen.getName());
-            Membership newMembership = new Membership("M" + System.currentTimeMillis(), citizen.getName(), "2024-10-24");
-            citizen.setMembership(newMembership);
+
+            // Create a new membership ID and assign it to the citizen
+            Membership newMembership = new Membership("M" + System.currentTimeMillis(), citizen.getName(), "2024-10-24", citizen.getId());
 
             // Add membership to the Firebase database
             FirebaseDB.addMembership(newMembership);
 
             System.out.println("Citizen " + citizen.getName() + " enrolled with membership ID: " + newMembership.getMembershipNumber());
+            notifyAll();  // Notify other waiting threads that enrollment is complete
             return true;  // Enrollment successful
 
-        } finally {
-            enrollmentLock.unlock();
+        } catch (Exception e) {
+            System.err.println("Enrollment failed for citizen " + citizen.getName() + ": " + e.getMessage());
+            return false;
+
         }
     }
 

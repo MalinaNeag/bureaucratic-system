@@ -3,9 +3,12 @@
 import static spark.Spark.*;
 import com.google.gson.Gson;
 
+import java.io.IOException;
+
 public class ApiServer {
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException {
+        FirebaseDB.initFirebase();
         port(4567);  // Setting the default port for the API
 
         Gson gson = new Gson();  // Gson to handle JSON responses
@@ -13,7 +16,7 @@ public class ApiServer {
         // Example Endpoint: GET all books
         get("/api/books", (req, res) -> {
             BookLoaningDepartment department = new BookLoaningDepartment();
-            return department.getAllBooks();  // Now it uses the proper method
+            return null;// department.getAllBooks();  // Now it uses the proper method
         }, gson::toJson);
 
         // Example Endpoint: POST a loan request

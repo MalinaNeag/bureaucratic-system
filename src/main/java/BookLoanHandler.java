@@ -1,4 +1,3 @@
-
 import com.google.gson.Gson;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
@@ -12,39 +11,33 @@ public class BookLoanHandler implements HttpHandler {
     @Override
     public void handle(HttpExchange exchange) throws IOException {
         if ("POST".equals(exchange.getRequestMethod())) {
-            LoanRequest request = gson.fromJson(new InputStreamReader(exchange.getRequestBody()), LoanRequest.class);
-            Citizen citizen = request.getCitizen();
-            String requestedBook = request.getBookTitle();
-
-            Thread citizenThread = new Thread(() -> BookLoaningDepartment.getInstance().borrowBook(citizen, requestedBook));
-            citizenThread.start();
-
-            String response = "Borrowing process started for: " + citizen.getName();
-            exchange.sendResponseHeaders(200, response.length());
-            OutputStream os = exchange.getResponseBody();
-            os.write(response.getBytes());
-            os.close();
         }
     }
 
     public boolean handleLoanRequest(LoanRequest loanRequest) {
-        // Extract the citizen and book title from the loan request
-        Citizen citizen = loanRequest.getCitizen();
-        String requestedBook = loanRequest.getBookTitle();
+        // Extract the citizen and book details from the loan request
+        String citizenName = loanRequest.getCitizenName();
+        Citizen citizen = new Citizen();
+        citizen.setName(citizenName);
+        String bookTitle = loanRequest.getBookTitle();
+        String bookAuthor = loanRequest.getBookAuthor();
 
-        if (citizen == null || requestedBook == null || requestedBook.isEmpty()) {
-            // Invalid request, missing citizen or book title
-            return false;
+        // Check for valid request
+        if (citizen == null || bookTitle == null || bookTitle.isEmpty()) {
+            return false; // Invalid request
         }
 
-        // Start a thread to handle the book borrowing process asynchronously
-        Thread loanThread = new Thread(() -> {
-            BookLoaningDepartment.getInstance().borrowBook(citizen, requestedBook);
-        });
-        loanThread.start();
+        // Call the BookLoaningDepartment to borrow the book
+        BookLoaningDepartment.getInstance().borrowBook(citizen, bookTitle, bookAuthor);
 
-        // Return true to indicate that the loan request has been initiated
-        return true;
+        return true; // Request initiated successfully
     }
 
+
+    private void sendResponse(HttpExchange exchange, String response) throws IOException {
+        exchange.sendResponseHeaders(200, response.length());
+        OutputStream os = exchange.getResponseBody();
+        os.write(response.getBytes());
+        os.close();
+    }
 }
