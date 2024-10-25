@@ -16,9 +16,9 @@ public class BookLoanHandler implements HttpHandler {
 
     public boolean handleLoanRequest(LoanRequest loanRequest) {
         // Extract the citizen and book details from the loan request
-        String citizenName = loanRequest.getCitizenName();
+        String citizenId = loanRequest.getCitizenId();
         Citizen citizen = new Citizen();
-        citizen.setName(citizenName);
+        citizen.setId(citizenId);
         String bookTitle = loanRequest.getBookTitle();
         String bookAuthor = loanRequest.getBookAuthor();
 

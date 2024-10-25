@@ -35,18 +35,21 @@ public class BookLoaningDepartment {
                 bookLoanLock.lock();
 
                 String membershipId = FirebaseDB.getMembershipIdById(citizen.getId());
-//                if (membershipId == null || !citizen.hasValidMembership()) {
-//                    System.out.println("No valid membership for citizen: " + citizen.getName());
-//                    return;
-//                }
+                EnrollmentDepartment enrollmentDepartment = EnrollmentDepartment.getInstance();
+                if (membershipId == null || !enrollmentDepartment.isCitizenEnrolled(citizen)) {
+                    System.out.println("No valid membership for citizen: " + citizen.getId());
+                    return;
+                }
 
                 Book book = FirebaseDB.getBookByTitleAndAuthor(bookTitle, bookAuthor);
+                //FirebaseDB.addBook(book);
+                //System.out.println(book.getId());
                 if (book != null && book.isAvailable()) {
                     book.setAvailable(false);
-                    //book.setBorrowedBy(new Citizen(membershipId, citizen.getName(), citizen.getId())); // Set borrower with citizen details
+                    book.setBorrowedBy(membershipId); // Set borrower with citizen details
                     book.setBorrowDate("2024-10-24"); // Placeholder date
                     FirebaseDB.updateBook(book);
-                    System.out.println("Book '" + bookTitle + "' borrowed by " + citizen.getName());
+                    System.out.println("Book '" + bookTitle + "' borrowed by " + membershipId);
                 } else {
                     System.out.println("Book '" + bookTitle + "' is not available or does not exist.");
                 }

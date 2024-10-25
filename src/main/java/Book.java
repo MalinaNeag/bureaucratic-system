@@ -5,13 +5,21 @@ public class Book {
     private boolean available;
     private String borrowDate;
     private String returnDate;
-    private Citizen borrowedBy;
+    private String borrowedBy;
+    public Book() {
+        // This constructor is needed for Firestore deserialization
+    }
 
-    public Book(String id, String name, String author, boolean available) {
+
+    public Book(String id, String name, String author, boolean available, String borrowDate, String borrowedBy, String returnDate) {
         this.id = id;
         this.name = name;
         this.author = author;
         this.available = available;
+        this.borrowDate = borrowDate;
+        this.borrowedBy = borrowedBy;
+        this.returnDate = returnDate;
+
     }
 
     // Getters and Setters
@@ -24,8 +32,8 @@ public class Book {
     public void setBorrowDate(String borrowDate) { this.borrowDate = borrowDate; }
     public String getReturnDate() { return returnDate; }
     public void setReturnDate(String returnDate) { this.returnDate = returnDate; }
-    public Citizen getBorrowedBy() { return borrowedBy; }
-    public void setBorrowedBy(Citizen borrowedBy) { this.borrowedBy = borrowedBy; }
+    public String getBorrowedBy() { return borrowedBy; }
+    public void setBorrowedBy(String borrowedBy) { this.borrowedBy = borrowedBy; }
 
     public void setName(String name) {
         this.name = name;

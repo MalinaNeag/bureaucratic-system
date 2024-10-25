@@ -92,6 +92,7 @@ public class FirebaseDB {
                     .get();
 
             List<QueryDocumentSnapshot> documents = query.get().getDocuments();
+            System.out.println(documents.get(0).getString("id"));
             if (!documents.isEmpty()) {
                 return documents.get(0).toObject(Book.class); // Return the first available book
             }
@@ -105,7 +106,7 @@ public class FirebaseDB {
         DocumentReference bookRef = firestore.collection("books").document(book.getId());
         Map<String, Object> updates = new HashMap<>();
         updates.put("available", book.isAvailable());
-       // updates.put("borrowedBy", book.getBorrowedBy().getMembershipId());
+        updates.put("borrowedBy", book.getBorrowedBy());
         updates.put("borrowDate", book.getBorrowDate());
 
         ApiFuture<WriteResult> future = bookRef.update(updates);
@@ -133,6 +134,26 @@ public class FirebaseDB {
             System.out.println("Membership added successfully at time: " + result.getUpdateTime());
         } catch (Exception e) {
             System.out.println("Error adding membership: " + e.getMessage());
+        }
+    }
+    public static void addBook(Book book) {
+        // Create a map of book fields to add to Firestore
+        Map<String, Object> bookData = new HashMap<>();
+        bookData.put("name", book.getName());
+        bookData.put("author", book.getAuthor());
+        bookData.put("available", book.isAvailable());
+        bookData.put("borrowDate", book.getBorrowDate());
+        bookData.put("borrowedBy", book.getBorrowedBy() != null ? book.getBorrowedBy() : null); // Assuming borrowedBy is a Citizen object
+
+        // Add a new document in the "books" collection
+        ApiFuture<WriteResult> future = firestore.collection("books").document(book.getId()).set(bookData);
+
+        try {
+            // Block and wait for the result
+            WriteResult result = future.get();
+            System.out.println("Book added successfully at time: " + result.getUpdateTime());
+        } catch (Exception e) {
+            System.out.println("Error adding book: " + e.getMessage());
         }
     }
 }
