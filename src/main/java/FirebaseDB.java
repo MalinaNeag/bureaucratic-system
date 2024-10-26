@@ -1,105 +1,59 @@
 import com.google.api.core.ApiFuture;
 import com.google.auth.oauth2.GoogleCredentials;
-import com.google.cloud.firestore.DocumentReference;
-import com.google.cloud.firestore.Firestore;
-import com.google.cloud.firestore.FirestoreOptions;
-import com.google.cloud.firestore.QueryDocumentSnapshot;
-import com.google.cloud.firestore.QuerySnapshot;
+import com.google.cloud.firestore.*;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
-import com.google.cloud.firestore.WriteResult; // Import WriteResult for update return type
+import com.google.firebase.cloud.FirestoreClient;
 
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-import com.google.firebase.cloud.FirestoreClient;
-
+import java.util.*;
 
 public class FirebaseDB {
     private static Firestore firestore;
 
-
     public static void initFirebase() throws IOException {
-        // Load the service account key JSON file
         InputStream serviceAccount = new FileInputStream("src/main/resources/key.json");
         GoogleCredentials credentials = GoogleCredentials.fromStream(serviceAccount);
+        FirebaseOptions options = new FirebaseOptions.Builder().setCredentials(credentials).build();
 
-        // Set up Firebase options
-        FirebaseOptions options = new FirebaseOptions.Builder()
-                .setCredentials(credentials)
-                .build();
-
-        // Initialize FirebaseApp if not already initialized
         if (FirebaseApp.getApps().isEmpty()) {
             FirebaseApp.initializeApp(options);
         }
 
-        // Assign the Firestore instance to the static field
         firestore = FirestoreClient.getFirestore();
-
         System.out.println("Firestore initialized successfully.");
     }
 
-    // Fetch the citizen's membership ID from Firestore by name
     public static String getMembershipIdById(String citizenId) {
         try {
             ApiFuture<QuerySnapshot> query = firestore.collection("memberships")
-                    .whereEqualTo("citizenId", citizenId)
-                    .get();
+                    .whereEqualTo("citizenId", citizenId).get();
             List<QueryDocumentSnapshot> documents = query.get().getDocuments();
-            if (!documents.isEmpty()) {
-                return documents.get(0).getId(); // Get the document ID as membership ID
-            }
+            if (!documents.isEmpty()) return documents.get(0).getId();
         } catch (Exception e) {
             e.printStackTrace();
         }
-        return null; // If no membership found
+        return null;
     }
 
-    // Updates the book status in Firestore and sets the borrowedBy field to the citizen's membership ID
     public static boolean borrowBook(String bookId, String membershipId) {
-        // Update book information in Firestore
         DocumentReference bookRef = firestore.collection("books").document(bookId);
-
         Map<String, Object> updates = new HashMap<>();
         updates.put("available", false);
         updates.put("borrowedBy", membershipId);
-        updates.put("borrowDate", "2024-10-24"); // Use current date in actual implementation
+        updates.put("borrowDate", "2024-10-24");
 
-        // Use WriteResult to capture the result of the update operation
         ApiFuture<WriteResult> future = bookRef.update(updates);
         try {
-            WriteResult result = future.get(); // Wait for the update to complete
+            WriteResult result = future.get();
             System.out.println("Book borrowed by membership ID: " + membershipId + " at time: " + result.getUpdateTime());
             return true;
         } catch (Exception e) {
             System.out.println("Error updating book: " + e.getMessage());
             return false;
         }
-    }
-
-    // Fetch a book by title and author
-    public static Book getBookByTitleAndAuthor(String title, String author) {
-        try {
-            ApiFuture<QuerySnapshot> query = firestore.collection("books")
-                    .whereEqualTo("name", title)
-                    .whereEqualTo("author", author)
-                    .whereEqualTo("available", true) // Ensure the book is available
-                    .get();
-
-            List<QueryDocumentSnapshot> documents = query.get().getDocuments();
-            System.out.println(documents.get(0).getString("id"));
-            if (!documents.isEmpty()) {
-                return documents.get(0).toObject(Book.class); // Return the first available book
-            }
-        } catch (Exception e) {
-            System.out.println("Error fetching book: " + e.getMessage());
-        }
-        return null; // If no book found
     }
 
     public static void updateBook(Book book) {
@@ -111,11 +65,25 @@ public class FirebaseDB {
 
         ApiFuture<WriteResult> future = bookRef.update(updates);
         try {
-            WriteResult result = future.get(); // Wait for the update to complete
+            WriteResult result = future.get();
             System.out.println("Book updated successfully at time: " + result.getUpdateTime());
         } catch (Exception e) {
             System.out.println("Error updating book: " + e.getMessage());
         }
+    }
+
+    public static Book getBookByTitleAndAuthor(String title, String author) {
+        try {
+            ApiFuture<QuerySnapshot> query = firestore.collection("books")
+                    .whereEqualTo("name", title)
+                    .whereEqualTo("author", author)
+                    .whereEqualTo("available", true).get();
+            List<QueryDocumentSnapshot> documents = query.get().getDocuments();
+            if (!documents.isEmpty()) return documents.get(0).toObject(Book.class);
+        } catch (Exception e) {
+            System.out.println("Error fetching book: " + e.getMessage());
+        }
+        return null;
     }
     public static void addMembership(Membership newMembership) {
         // Create a map of membership fields to add to Firestore
@@ -136,24 +104,59 @@ public class FirebaseDB {
             System.out.println("Error adding membership: " + e.getMessage());
         }
     }
-    public static void addBook(Book book) {
-        // Create a map of book fields to add to Firestore
-        Map<String, Object> bookData = new HashMap<>();
-        bookData.put("name", book.getName());
-        bookData.put("author", book.getAuthor());
-        bookData.put("available", book.isAvailable());
-        bookData.put("borrowDate", book.getBorrowDate());
-        bookData.put("borrowedBy", book.getBorrowedBy() != null ? book.getBorrowedBy() : null); // Assuming borrowedBy is a Citizen object
 
-        // Add a new document in the "books" collection
-        ApiFuture<WriteResult> future = firestore.collection("books").document(book.getId()).set(bookData);
+    public static void addOrUpdateDocumentForCitizen(String citizenId, String documentName) {
+        DocumentReference docRef = firestore.collection("citizenDocuments").document(citizenId);
+
+        // Execute a transaction to update or add a new document to the list of documents
+        ApiFuture<Void> transactionFuture = firestore.runTransaction(trans -> {
+            // Correctly fetch the document snapshot by resolving the future
+            DocumentSnapshot snapshot = trans.get(docRef).get();
+            List<String> documents;
+            if (snapshot.exists() && snapshot.contains("documentNames")) {
+                documents = (List<String>) snapshot.get("documentNames");
+                if (!documents.contains(documentName)) {
+                    documents.add(documentName);
+                }
+            } else {
+                documents = new ArrayList<>();
+                documents.add(documentName);
+            }
+            trans.set(docRef, Collections.singletonMap("documentNames", documents), SetOptions.merge());
+            return null; // No result needed
+        });
 
         try {
-            // Block and wait for the result
-            WriteResult result = future.get();
-            System.out.println("Book added successfully at time: " + result.getUpdateTime());
+            transactionFuture.get(); // Blocking call to ensure transaction completes
+            System.out.println("Document successfully added/updated for citizen: " + citizenId);
         } catch (Exception e) {
-            System.out.println("Error adding book: " + e.getMessage());
+            System.err.println("Error during transaction for citizen: " + e.getMessage());
+        }
+    }
+    public static boolean hasDocument(String citizenId, String documentName) {
+        DocumentReference docRef = firestore.collection("citizenDocuments").document(citizenId);
+        try {
+            DocumentSnapshot documentSnapshot = docRef.get().get();
+            if (documentSnapshot.exists()) {
+                Object data = documentSnapshot.get("documentNames");
+                if (data instanceof List<?>) {
+                    List<?> documents = (List<?>) data;
+                    if (documents.stream().allMatch(item -> item instanceof String)) {
+                        return documents.contains(documentName);
+                    } else {
+                        System.err.println("Document list contains non-string items.");
+                    }
+                } else {
+                    assert data != null;
+                    System.err.println("Expected documentNames to be a list but was " + data.getClass().getSimpleName());
+                }
+            } else {
+                System.out.println("No document found for citizen ID: " + citizenId);
+            }
+            return false;
+        } catch (Exception e) {
+            System.err.println("Error checking document for citizen: " + e.getMessage());
+            return false;
         }
     }
 }

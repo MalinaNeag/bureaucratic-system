@@ -1,16 +1,26 @@
 import java.util.List;
-import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.Map;
 import java.util.Queue;
-import java.util.LinkedList;
 
-public class BookLoaningDepartment {
+public class BookLoaningDepartment implements Department {
     private static BookLoaningDepartment instance;
-    private final Queue<Citizen> queue = new LinkedList<>();
-    private final Lock bookLoanLock = new ReentrantLock();
+    private final Queue<BorrowRequest> queue = new LinkedBlockingQueue<>();
+    private final Map<String, Lock> bookLocks = new ConcurrentHashMap<>();
+    private final Thread counter1;
+    private final Thread counter2;
+    private volatile boolean counter1Paused = false;
+    private volatile boolean counter2Paused = false;
 
-    protected BookLoaningDepartment() {}
+    private BookLoaningDepartment() {
+        counter1 = new Thread(() -> processQueue(1));
+        counter2 = new Thread(() -> processQueue(2));
+        counter1.start();
+        counter2.start();
+    }
 
     public static synchronized BookLoaningDepartment getInstance() {
         if (instance == null) {
@@ -19,50 +29,100 @@ public class BookLoaningDepartment {
         return instance;
     }
 
-    public void borrowBook(Citizen citizen, String bookTitle, String bookAuthor) {
+    public void addCitizenToQueue(Citizen citizen, String bookTitle, String bookAuthor) {
         synchronized (queue) {
-            queue.add(citizen);
+            if (canIssueDocument("Loan Approval", citizen)) {
+                queue.add(new BorrowRequest(citizen, bookTitle, bookAuthor));
+                queue.notifyAll();
+            } else {
+                System.out.println("Citizen " + citizen.getId() + " does not meet requirements for loan.");
+            }
         }
+    }
 
-        new Thread(() -> {
-            try {
-                synchronized (queue) {
-                    while (queue.peek() != citizen) {
-                        queue.wait();
+    private boolean canIssueDocument(String documentName, Citizen citizen) {
+        System.out.println("Checking issuance requirements for document: " + documentName + " for citizen: " + citizen.getId());
+
+        for (Office office : ApiServer.getOffices()) {
+            for (Document document : office.getDocuments()) {
+                if (document.getName().equals(documentName)) {
+                    System.out.println("Found document: " + documentName + " with dependencies: " + document.getDependencies());
+                    for (String dependency : document.getDependencies()) {
+                        if (!FirebaseDB.hasDocument(citizen.getId(), dependency)) {
+                            System.out.println("Citizen " + citizen.getId() + " does not have required dependency: " + dependency);
+                            return false;  // Missing required dependency
+                        }
                     }
-                }
-
-                bookLoanLock.lock();
-
-                String membershipId = FirebaseDB.getMembershipIdById(citizen.getId());
-                EnrollmentDepartment enrollmentDepartment = EnrollmentDepartment.getInstance();
-                if (membershipId == null || !enrollmentDepartment.isCitizenEnrolled(citizen)) {
-                    System.out.println("No valid membership for citizen: " + citizen.getId());
-                    return;
-                }
-
-                Book book = FirebaseDB.getBookByTitleAndAuthor(bookTitle, bookAuthor);
-                //FirebaseDB.addBook(book);
-                //System.out.println(book.getId());
-                if (book != null && book.isAvailable()) {
-                    book.setAvailable(false);
-                    book.setBorrowedBy(membershipId); // Set borrower with citizen details
-                    book.setBorrowDate("2024-10-24"); // Placeholder date
-                    FirebaseDB.updateBook(book);
-                    System.out.println("Book '" + bookTitle + "' borrowed by " + membershipId);
-                } else {
-                    System.out.println("Book '" + bookTitle + "' is not available or does not exist.");
-                }
-
-            } catch (Exception e) {
-                e.printStackTrace();
-            } finally {
-                bookLoanLock.unlock();
-                synchronized (queue) {
-                    queue.remove();
-                    queue.notifyAll();
+                    System.out.println("All dependencies met for document: " + documentName);
+                    return true;  // All dependencies met
                 }
             }
-        }).start();
+        }
+        System.out.println("Document not found: " + documentName);
+        return false;  // Document not found
+    }
+
+    @Override
+    public void pauseCounter(int counterId) {
+        if (counterId == 1) {
+            synchronized (counter1) {
+                counter1Paused = true;
+            }
+            System.out.println("Counter 1 is paused.");
+        } else if (counterId == 2) {
+            synchronized (counter2) {
+                counter2Paused = true;
+            }
+            System.out.println("Counter 2 is paused.");
+        }
+    }
+
+    @Override
+    public void resumeCounter(int counterId) {
+        if (counterId == 1) {
+            synchronized (counter1) {
+                counter1Paused = false;
+                counter1.notify();  // Notify any waiting threads on this object
+            }
+            System.out.println("Counter 1 is resumed.");
+        } else if (counterId == 2) {
+            synchronized (counter2) {
+                counter2Paused = false;
+                counter2.notify();  // Notify any waiting threads on this object
+            }
+            System.out.println("Counter 2 is resumed.");
+        }
+    }
+
+    private void processQueue(int counterId) {
+        while (true) {
+            try {
+                synchronized (this) {
+                    while ((counterId == 1 && counter1Paused) || (counterId == 2 && counter2Paused)) wait();
+                }
+                BorrowRequest request;
+                synchronized (queue) {
+                    while (queue.isEmpty()) queue.wait();
+                    request = queue.poll();
+                }
+                if (request != null) tryToBorrowBook(request.getCitizen(), request.getBookTitle(), request.getBookAuthor());
+            } catch (InterruptedException e) { Thread.currentThread().interrupt(); return; }
+        }
+    }
+
+    private void tryToBorrowBook(Citizen citizen, String bookTitle, String bookAuthor) {
+        Book book = FirebaseDB.getBookByTitleAndAuthor(bookTitle, bookAuthor);
+        if (book == null) return;
+
+        bookLocks.putIfAbsent(book.getId(), new ReentrantLock());
+        Lock bookLock = bookLocks.get(book.getId());
+
+        bookLock.lock();
+        try {
+            if (book.isAvailable() && FirebaseDB.getMembershipIdById(citizen.getId()) != null) {
+                book.setAvailable(false);
+                FirebaseDB.updateBook(book);
+            } else System.out.println("Book unavailable.");
+        } finally { bookLock.unlock(); }
     }
 }
