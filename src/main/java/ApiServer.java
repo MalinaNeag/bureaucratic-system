@@ -54,7 +54,7 @@ public class ApiServer {
             }
 
             try {
-                int counterId = Integer.parseInt(counterIdParam); // Parse counterId as an integer
+                int counterId = Integer.parseInt(counterIdParam); // Parse countedrId as an integer
                 Department department = departments.get(departmentName);
 
                 if (department != null) {

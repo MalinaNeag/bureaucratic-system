@@ -144,7 +144,7 @@ public class BookLoaningDepartment implements Department {
     private void tryToBorrowBook(Citizen citizen, String bookTitle, String bookAuthor) {
         System.out.println("Attempting to borrow the book titled '" + bookTitle + "' by '" + bookAuthor + "' for citizen with ID: " + citizen.getId());
 
-        // Retrieve the book based on title and author
+        // Retrieve the book based on title and authorr
         Book book = FirebaseDB.getBookByTitleAndAuthor(bookTitle, bookAuthor);
         if (book == null) {
             System.out.println("No book found with title '" + bookTitle + "' and author '" + bookAuthor + "'.");
