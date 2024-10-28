@@ -1,121 +1,71 @@
 # Bureaucracy Manager - CEBP PROJECT
 
 ## Overview
-The Bureaucracy Manager is a software system designed to guide and assist clients navigating the often complex procedures of a classic bureaucratic system. The application simulates a public library environment where citizens request various documents or services. The system can manage an arbitrary number of offices and documents, where obtaining certain documents requires prior completion of intermediate tasks.
+The Bureaucracy Manager is a software system designed to streamline interactions within a bureaucratic system, using a public library scenario where citizens request various documents or services. This simulation includes managing multiple offices, handling document dependencies, and processing requests through queues and concurrency control.
 
 ## Key Features
-- **Office Management**: The application supports multiple offices with specific document-related functions.
-- **Document Dependencies**: Certain documents may require prerequisites to be obtained.
-- **Queue Management**: Simulated counters handle user requests, with possible temporary closures for breaks.
-- **Concurrency Handling**: The system effectively manages multiple threads simulating customer interactions.
+- **Office Management**: Supports multiple offices with specific functions related to document processing.
+- **Document Dependencies**: Manages dependencies where certain documents are prerequisites for others.
+- **Queue Management**: Utilizes queues at simulated counters to manage user requests efficiently.
+- **Concurrency Handling**: Handles multiple user interactions simultaneously, ensuring data consistency and availability.
+- **Coffee Break Simulation**: Simulates temporary closures of counters for coffee breaks, adding realism and complexity to queue management.
 
 ## Configuration Elements
-The system operates based on a configuration file containing:
-- Offices and the documents they issue.
-- Dependencies between documents indicating which documents are needed to receive another.
+The system reads from a configuration file to set up:
+- Offices and the documents they handle.
+- Dependencies that specify prerequisites for obtaining certain documents.
+
+## API Endpoints
+- `POST /api/loan-request`: Processes a book loan request and adds it to the queue.
+- `POST /api/pause-counter`: Temporarily pauses a counter to simulate coffee breaks or load management.
+- `POST /api/resume-counter`: Resumes operations at a paused counter, managing backlogs efficiently.
+- `POST /api/enroll`: Handles the enrollment of new citizens based on provided data.
 
 ## Departments
-<img width="248" alt="image" src="https://github.com/user-attachments/assets/18d527d9-995a-4750-8520-77bcd2a04fa4">
+![Department Structure](https://github.com/user-attachments/assets/18d527d9-995a-4750-8520-77bcd2a04fa4)
 
-### 1. Enrollment Department
-**Functions:**
-- Issue Citizen Membership Cards.
-- Issue Admin Membership Cards.
-- Verify Identity Cards (e.g., passport, birth certificate).
-- Manage member information (creation, deletion, and updates).
+### Enrollment Department
+**Counters:** 1
+- Handles citizen registration, verifying identities, and managing membership details.
 
-**Office Counters:** 1 office
+### Book Loaning Department
+**Counters:** 2, with the ability to pause for coffee breaks
+- Manages book loans, returns, and penalties related to late returns.
+- Utilizes real-time queue management for handling book requests, ensuring efficient processing even during peak times.
 
-### 2. Book Loaning Department
-**Functions:**
-- Borrow and return books.
-- Issue Book Loan Slips for valid transactions.
-- Process Return Confirmation Slips upon book returns.
-- Monitor late returns and enforce penalties (issue Late Return Penalty Notices).
-- Block further loans if the user has:
-  - Books past the due date.
-  - More than 3 past-due books (until fees are paid).
-
-**Office Counters:** 3 offices (may be temporarily closed due to "coffee breaks" or system overload).
-
-### 3. Library Administration Department
-**Functions:**
-- Maintain a Library Book Availability Report for all users.
-- Administer the Loan History Report (including checking for past-due books and penalties).
-- Process fees for Late Return Penalty Notices.
-- Manage the library's database (inventory, overdue books, member management).
-- Admins have additional privileges (viewing loan histories, bypassing some restrictions).
-
-**Office Counters:** 2 offices
+### Library Administration Department
+**Counters:** 2
+- Oversees the library's operations including book availability, loan histories, and administrative updates.
+- Capable of pausing operations at counters for administrative reviews or breaks.
 
 ## Concurrency Issues and Solutions
 
-### 1. Admin Updating Books Database
-**Problem:** Concurrent requests from citizens or other admins may cause data inconsistencies during updates.
+### 1. Multiple Loan Requests for the Same Book
+**Problem:** Simultaneous requests for the same book can result in conflicts and incorrect loan processing.
+**Solution:** Utilizes a ConcurrentHashMap to manage locks on individual books, ensuring that only one process can modify the book’s state at a time.
 
-**Solution:**
-- Implement a write lock on the database during updates to prevent access from other operations.
-- Notify users when the database is being updated.
-<img width="277" alt="image" src="https://github.com/user-attachments/assets/167f853c-c8b1-45b7-9408-d43f18789cce">
-
-### 2. Waiting for a Free Counter
-**Problem:** Multiple users trying to access a counter may lead to frustration if they have to wait.
-
-**Solution:**
-- Use a queue management system for each counter.
-- Provide estimated wait times and notifications when it’s their turn.
-<img width="337" alt="image" src="https://github.com/user-attachments/assets/a7d60122-958e-4eb1-97cc-9dab48bea134">
-
-### 3. Borrowing a Book
-**Process:**
-1. Citizen requests to borrow a book.
-2. Lock the book for processing.
-3. Conduct synchronized checks:
-   - Identity Verification
-   - Past-Due Book Check
-   - Outstanding Fees Check
-4. If all checks pass, issue the loan slip and update the book status.
-5. Release locks for further processing.
 <img width="452" alt="image" src="https://github.com/user-attachments/assets/318aa4e2-6290-4a0c-830e-d1446563b8a9">
 
-## Dependency Flow with Concurrency Handling
+### 2. Enrollment of a Citizen
+**Problem:** Concurrent enrollment requests could lead to duplicate records.
+**Solution:** Uses synchronized methods in the EnrollmentDepartment to ensure atomic operations for checking and updating citizen records.
 
-### 1. Enrollment Process for Citizens
-1. Citizen presents their Identity Card.
-2. The system verifies the identity (synchronized check).
-3. Upon successful verification, the citizen is issued a Citizen Membership Card.
+### 3. Updating the Books Database
+**Problem:** Concurrent database updates by admins could lead to data inconsistencies.
+**Solution:** Implements a write lock during database updates to prevent other operations from accessing the database simultaneously.
 
-### 2. Enrollment Process for Admins
-1. Admin presents their Identity Card.
-2. The system verifies the identity (synchronized check).
-3. Upon successful verification, the admin is issued an Admin Membership Card.
+<img width="277" alt="image" src="https://github.com/user-attachments/assets/167f853c-c8b1-45b7-9408-d43f18789cce">
 
-### 3. Borrowing a Book with Document Dependencies
-1. Citizen requests to borrow a book.
-2. Lock the book for processing.
-3. Conduct synchronized checks:
-   - Identity Verification
-   - Past-Due Book Check
-   - Outstanding Fees Check
-4. If all checks pass, issue the loan slip and update the book status.
-5. Release locks for further processing.
+### 4. Queue Management for Loan Requests
+**Problem:** Managing a queue in a multi-threaded environment could lead to lost updates or inconsistent states.
+**Solution:** Employs a LinkedBlockingQueue to automatically handle concurrent additions and removals safely.
 
-### 4. Returning a Book
-1. Citizen presents the Book Loan Slip and Membership Card.
-2. The system checks if the return is on time:
-   - If late, issue a Late Return Penalty Notice.
-3. Generate a Return Confirmation Slip.
+### 5. Pausing and Resuming Counters
+**Problem:** Pausing and resuming counters without proper synchronization could lead to deadlocks or indefinite waits.
+**Solution:** Uses boolean flags and synchronization on these flags to manage counter states safely, avoiding deadlocks and ensuring counters are paused and resumed correctly.
 
-### 5. Admin Updating the Books Database
-1. Admin requests to update the database.
-2. The system places a write lock on the database.
-3. The admin makes necessary updates.
-4. Once updates are complete, release the lock.
-
-### 6. Accessing Counter Services
-1. Citizens or admins arrive at the counter.
-2. If busy, users are placed in a queue and informed of their estimated wait time.
-3. When a counter is free, the next user in the queue is notified and served.
+## System Configuration
+The system is configured through a JSON file, which is loaded at runtime to set up office and document information based on predefined schemas.
 
 ## Conclusion
-The Bureaucracy Manager project aims to provide a robust solution for managing document requests in a public library environment, ensuring efficient handling of customer interactions and administrative tasks through effective concurrency management.
+Bureaucracy Manager offers a robust solution for simulating a public library's bureaucratic processes, emphasizing efficient and reliable handling of concurrent user interactions and administrative tasks, including realistic simulations of coffee breaks and load management at multiple counters.
