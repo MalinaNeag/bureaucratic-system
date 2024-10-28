@@ -122,16 +122,20 @@ public class ApiServer {
     }
 
     private static List<Office> parseConfiguration(JsonObject configJson) {
+        System.out.println("Starting to parse configuration for offices.");
         List<Office> parsedOffices = new ArrayList<>();
         JsonArray officeArray = configJson.getAsJsonArray("offices");
+        System.out.println("Found " + officeArray.size() + " offices in configuration.");
 
         for (JsonElement officeElement : officeArray) {
             JsonObject officeObj = officeElement.getAsJsonObject();
             String officeName = officeObj.get("name").getAsString();
             int counters = officeObj.get("counters").getAsInt();
+            System.out.println("Parsing office: " + officeName + " with " + counters + " counters.");
 
             List<Document> documents = new ArrayList<>();
             JsonArray documentArray = officeObj.getAsJsonArray("documents");
+            System.out.println("Found " + documentArray.size() + " documents in office: " + officeName);
 
             for (JsonElement documentElement : documentArray) {
                 JsonObject docObj = documentElement.getAsJsonObject();
@@ -139,16 +143,21 @@ public class ApiServer {
 
                 List<String> dependencies = new ArrayList<>();
                 JsonArray depArray = docObj.getAsJsonArray("dependencies");
+                System.out.println("Document '" + docName + "' has " + depArray.size() + " dependencies.");
+
                 for (JsonElement depElement : depArray) {
                     dependencies.add(depElement.getAsString());
                 }
+                System.out.println("Added document '" + docName + "' with dependencies: " + dependencies);
 
                 documents.add(new Document(docName, dependencies));
             }
 
             parsedOffices.add(new Office(officeName, counters, documents));
+            System.out.println("Added office: " + officeName + " with " + documents.size() + " documents.");
         }
 
+        System.out.println("Finished parsing configuration. Total offices parsed: " + parsedOffices.size());
         return parsedOffices;
     }
 }

@@ -97,32 +97,85 @@ public class BookLoaningDepartment implements Department {
     private void processQueue(int counterId) {
         while (true) {
             try {
+                final Object pauseLock = (counterId == 1) ? counter1 : counter2;
+                synchronized (pauseLock) {
+                    // Wait if the specific counter is paused
+                    while ((counterId == 1 && counter1Paused) || (counterId == 2 && counter2Paused)) {
+                        System.out.println("Counter " + counterId + " is paused, waiting...");
+                        pauseLock.wait();
+                    }
+                }
+
+                // Check for the global pause condition when both counters are paused
                 synchronized (this) {
-                    while ((counterId == 1 && counter1Paused) || (counterId == 2 && counter2Paused)) wait();
+                    // If both counters are paused, wait on the global object
+                    if (counter1Paused && counter2Paused) {
+                        System.out.println("Both counters are paused, waiting...");
+                        this.wait();
+                        continue; // After being notified, check the pause condition again
+                    }
                 }
-                BorrowRequest request;
+
+                BorrowRequest request = null;
                 synchronized (queue) {
-                    while (queue.isEmpty()) queue.wait();
-                    request = queue.poll();
+                    if (!queue.isEmpty()) {
+                        request = queue.poll();
+                    }
                 }
-                if (request != null) tryToBorrowBook(request.getCitizen(), request.getBookTitle(), request.getBookAuthor());
-            } catch (InterruptedException e) { Thread.currentThread().interrupt(); return; }
+
+                // If a request is available, process it
+                if (request != null) {
+                    tryToBorrowBook(request.getCitizen(), request.getBookTitle(), request.getBookAuthor());
+                } else {
+                    // If the queue is empty, wait for new requests
+                    synchronized (queue) {
+                        System.out.println("Queue is empty, waiting for requests...");
+                        queue.wait();
+                    }
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt(); // Restore interruption status
+                System.out.println("Thread interrupted: " + counterId);
+                return; // Optionally return to end the thread or handle interruption appropriately
+            }
         }
     }
 
     private void tryToBorrowBook(Citizen citizen, String bookTitle, String bookAuthor) {
-        Book book = FirebaseDB.getBookByTitleAndAuthor(bookTitle, bookAuthor);
-        if (book == null) return;
+        System.out.println("Attempting to borrow the book titled '" + bookTitle + "' by '" + bookAuthor + "' for citizen with ID: " + citizen.getId());
 
+        // Retrieve the book based on title and author
+        Book book = FirebaseDB.getBookByTitleAndAuthor(bookTitle, bookAuthor);
+        if (book == null) {
+            System.out.println("No book found with title '" + bookTitle + "' and author '" + bookAuthor + "'.");
+            return;
+        }
+        System.out.println("Book found. Book ID: " + book.getId() + ", Available: " + book.isAvailable());
+
+        // Ensure a lock is in place for the book if not already locked
         bookLocks.putIfAbsent(book.getId(), new ReentrantLock());
         Lock bookLock = bookLocks.get(book.getId());
+        System.out.println("Lock acquired for book ID: " + book.getId());
 
+        // Try to lock the book to start the borrowing process
         bookLock.lock();
         try {
+            System.out.println("Locked book ID: " + book.getId() + ". Checking availability and membership validity.");
+
+            // Check if the book is available and if the citizen has a valid membership
             if (book.isAvailable() && FirebaseDB.getMembershipIdById(citizen.getId()) != null) {
+                // Update the book status to unavailable
                 book.setAvailable(false);
                 FirebaseDB.updateBook(book);
-            } else System.out.println("Book unavailable.");
-        } finally { bookLock.unlock(); }
+                System.out.println("Book '" + bookTitle + "' by '" + bookAuthor + "' is now borrowed by citizen ID: " + citizen.getId());
+            } else {
+                // Notify that the book is not available for borrowing
+                System.out.println("Book unavailable or citizen does not have a valid membership. Book ID: " + book.getId());
+            }
+        } finally {
+            // Unlock the book lock regardless of the outcome to ensure other threads can access it
+            bookLock.unlock();
+            System.out.println("Lock released for book ID: " + book.getId());
+        }
     }
 }

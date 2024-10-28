@@ -37,7 +37,7 @@ public class EnrollmentDepartment {
         }
     }
 
-    public boolean enrollCitizen(Citizen citizen) {
-        return addCitizen(citizen);
-    }
+//    public boolean enrollCitizen(Citizen citizen) {
+//        return addCitizen(citizen);
+//    }
 }
